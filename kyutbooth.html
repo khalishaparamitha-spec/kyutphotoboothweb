@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kyutbooth — Studio System</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary: #ff477e;
+      --primary-hover: #ff0055;
+      --bg: #f8f9fa;
+      --card-bg: #ffffff;
+      --text: #2b2d42;
+      --border: #e0e0e0;
+      --admin-color: #6c5ce7;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background: #f0f2f5; color: var(--text); padding: 1.5rem 1rem; min-height: 100vh; }
+
+    header { display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto 1.5rem; flex-wrap: wrap; gap: 10px; }
+    header h1 { font-family: 'Fredoka', sans-serif; color: var(--primary); font-size: 2rem; display: flex; align-items: center; gap: 10px; }
+    
+    .role-badge { padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
+    .badge-user { background: #e3f2fd; color: #0d6efd; }
+    .badge-admin { background: #f3e8ff; color: var(--admin-color); }
+
+    .main-layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-items: start; gap: 1.5rem; max-width: 1400px; margin: 0 auto; }
+    @media (max-width: 900px) { .main-layout { grid-template-columns: 1fr; } .canvas-container { position: static; } }
+    @media (min-width: 901px) { .viewport-container { max-width: 540px; margin: 0 auto; } }
+
+    .card { background: var(--card-bg); border-radius: 20px; padding: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+
+    /* Kamera Viewport */
+    .viewport-container { position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    
+    video, img#upload-preview { 
+      width: 100%; height: 100%; object-fit: cover; 
+      transition: transform 0.2s ease-in-out;
+    }
+
+    video.mirrored { transform: scaleX(-1); }
+    
+    .countdown-overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center;
+      color: white; font-size: 6rem; font-family: 'Fredoka', sans-serif; font-weight: bold; z-index: 10;
+    }
+
+    .flash-effect { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; opacity: 0; pointer-events: none; z-index: 11; }
+    .flash-active { animation: flashAnim 0.3s ease-out; }
+    @keyframes flashAnim { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+    .controls-group { display: flex; gap: 8px; margin-top: 1rem; flex-wrap: wrap; }
+    .btn { flex: 1; padding: 12px 14px; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; background: #e9ecef; color: var(--text); }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-admin { background: var(--admin-color); color: white; }
+    .btn-active { background: #343a40; color: white; }
+    .btn-sm { padding: 6px 10px; font-size: 0.8rem; border-radius: 6px; }
+
+    .section-title { font-family: 'Fredoka', sans-serif; font-size: 1.1rem; margin: 1.2rem 0 0.8rem; color: var(--text); display: flex; align-items: center; gap: 8px; }
+
+    /* Frame Gallery Items */
+    .frame-selector { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; max-height: 240px; overflow-y: auto; padding-right: 5px; }
+    .frame-option {
+      border: 2px solid var(--border); border-radius: 12px; padding: 8px; text-align: center; cursor: pointer; transition: all 0.2s; font-size: 0.75rem; font-weight: 600; background: #fff;
+      display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative;
+    }
+    .frame-option img { width: 100%; height: 75px; object-fit: contain; border-radius: 6px; background: #f0f0f0; }
+    .frame-option > span { overflow-wrap: anywhere; }
+    .frame-delete { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border: 0; border-radius: 6px; background: #dc3545; color: white; cursor: pointer; display: grid; place-items: center; }
+    .frame-delete:hover { background: #b02a37; }
+    .frame-option:hover, .frame-option.selected { border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255, 71, 126, 0.2); }
+
+    /* Photo Order Manager */
+    .photo-list { display: flex; flex-direction: column; gap: 8px; margin-top: 0.5rem; max-height: 180px; overflow-y: auto; }
+    .photo-item { display: flex; align-items: center; gap: 10px; background: var(--bg); padding: 8px; border-radius: 10px; border: 1px solid var(--border); }
+    .photo-item img { width: 50px; height: 38px; object-fit: cover; border-radius: 6px; }
+    .photo-item .actions { display: flex; gap: 4px; margin-left: auto; }
+
+    /* Output Canvas */
+    .canvas-container { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-width: 0; max-height: calc(100dvh - 2.5rem); position: sticky; top: 1.25rem; }
+    .result-scroll { width: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; justify-content: center; align-items: flex-start; scrollbar-width: thin; scrollbar-color: var(--primary) var(--bg); }
+    .result-scroll::-webkit-scrollbar { width: 8px; }
+    .result-scroll::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 8px; }
+    .result-scroll::-webkit-scrollbar-track { background: var(--bg); border-radius: 8px; }
+    /* Hasil strip selalu muat utuh dalam satu layar: tinggi dibatasi tinggi layar */
+    #photobooth-canvas { display: block; flex: 0 0 auto; width: auto; height: auto; max-width: 100%; max-height: calc(100dvh - 215px); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+    @media (max-width: 900px) { .canvas-container { max-height: 80dvh; } #photobooth-canvas { max-height: calc(80dvh - 120px); } }
+    .download-btn { flex: 0 0 auto; width: min(100%, 280px); margin-top: 1.25rem; font-size: 0.95rem; padding: 11px 16px; }
+
+    .layout-switcher { display: flex; gap: 10px; margin-bottom: 1rem; }
+    .layout-btn { flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: white; cursor: pointer; font-size: 0.85rem; font-weight: 600; text-align: center; }
+    .layout-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+    /* Admin Panel Styling */
+    .admin-panel { background: #f3f0ff; border: 2px dashed var(--admin-color); padding: 1rem; border-radius: 16px; margin-bottom: 1.5rem; display: none; }
+    .admin-panel.active { display: block; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1><i class="fa-solid fa-camera-retro"></i> Kyutbooth</h1>
+    
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span id="role-indicator" class="role-badge badge-user"><i class="fa-solid fa-user"></i> Mode User</span>
+      <button class="btn btn-sm" id="toggle-admin-btn" onclick="toggleAdminAuth()"><i class="fa-solid fa-lock"></i> Login Admin</button>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    
+    <!-- KOLOM KIRI: KAMERA, PENGATURAN FOTO & FRAME -->
+    <div class="card">
+      
+      <!-- ADMIN PANEL -->
+      <div id="admin-panel" class="admin-panel">
+        <h4 style="color: var(--admin-color); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-user-gear"></i> Panel Admin: Upload Desain Frame Custom
+        </h4>
+        <p style="font-size: 0.8rem; color: #555; margin-bottom: 10px;">Upload file gambar PNG transparan agar foto pengguna berada tepat di bagian dalam frame.</p>
+        
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <input type="text" id="frame-name-input" placeholder="Nama Frame" style="padding: 8px; border-radius: 8px; border: 1px solid var(--border); flex: 1; font-size: 0.85rem;">
+          <input type="file" id="admin-frame-file" accept="image/*" style="font-size: 0.8rem; flex: 1;">
+          <button class="btn btn-admin btn-sm" onclick="uploadFrameAsAdmin()"><i class="fa-solid fa-plus"></i> Tambah Frame</button>
+        </div>
+      </div>
+
+      <!-- Kamera Viewport -->
+      <div class="viewport-container">
+        <video id="webcam" autoplay playsinline class="mirrored"></video>
+        <img id="upload-preview" style="display: none;" alt="Preview Foto Upload">
+        <div id="countdown" class="countdown-overlay">3</div>
+        <div id="flash" class="flash-effect"></div>
+      </div>
+
+      <!-- Controls Kamera -->
+      <div class="controls-group">
+        <button class="btn btn-primary" onclick="takeSnapWithCountdown()"><i class="fa-solid fa-camera"></i> Ambil Foto</button>
+        
+        <button class="btn btn-active" id="btn-toggle-mirror" onclick="toggleMirrorMode()">
+          <i class="fa-solid fa-right-left"></i> Flip Mirror
+        </button>
+
+        <button class="btn" onclick="switchCameraFacing()">
+          <i class="fa-solid fa-arrows-rotate"></i> Switch Cam
+        </button>
+
+        <button class="btn" onclick="triggerUpload()"><i class="fa-solid fa-upload"></i> Upload</button>
+        <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="handleFileUpload(event)">
+      </div>
+
+      <!-- Layout Switcher -->
+      <div class="section-title"><i class="fa-solid fa-border-all"></i> Mode Layout Strip</div>
+      <div class="layout-switcher">
+        <div class="layout-btn active" onclick="setLayout('strip', this)">Strip (3 Foto)</div>
+        <div class="layout-btn" onclick="setLayout('grid', this)">Grid (2x2 Foto)</div>
+        <div class="layout-btn" onclick="setLayout('single', this)">Single Portrait</div>
+      </div>
+
+      <!-- SELEKSI FRAME (DIPILIH DARI DAFTAR DESAIN APLIKASI / ADMIN) -->
+      <div class="section-title"><i class="fa-solid fa-palette"></i> Pilih Desain Frame Custom</div>
+      
+      <div class="frame-selector" id="frame-list">
+        <!-- Pilihan Frame akan dirender secara dinamis -->
+      </div>
+
+      <!-- SUSUNAN FOTO (REORDER) -->
+      <div class="section-title"><i class="fa-solid fa-sort"></i> Atur Urutan Foto</div>
+      <div class="photo-list" id="photo-order-list">
+        <p style="font-size: 0.85rem; color: #888;">Belum ada foto diambil.</p>
+      </div>
+
+      <button class="btn" onclick="resetGallery()" style="width: 100%; margin-top: 1rem; color: #dc3545;"><i class="fa-solid fa-rotate-left"></i> Reset Semua Foto</button>
+
+    </div>
+
+    <!-- KOLOM KANAN: PREVIEW CANVAS & DOWNLOAD -->
+    <div class="card canvas-container result-card">
+      <h3 style="margin-bottom: 1rem; font-family: 'Fredoka', sans-serif;"><i class="fa-solid fa-image"></i> Hasil Photo Strip</h3>
+      
+      <div class="result-scroll" role="region" aria-label="Gulir hasil photo strip" tabindex="0">
+        <canvas id="photobooth-canvas"></canvas>
+      </div>
+
+      <button class="btn btn-primary download-btn" onclick="downloadPhoto()">
+        <i class="fa-solid fa-download"></i> Download Hasil (PNG)
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+
+    let isAdmin = false;
+
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('photobooth-canvas');
+    const ctx = canvas.getContext('2d');
+    const countdownEl = document.getElementById('countdown');
+    const flashEl = document.getElementById('flash');
+    const uploadPreview = document.getElementById('upload-preview');
+
+    let isMirrored = true;
+    let currentFacingMode = 'user';
+    let currentStream = null;
+
+    let capturedPhotos = [];
+    let currentLayout = 'strip';
+    let currentFrame = 'classic_black';
+    let selectedFrameObj = null;
+
+    // Database Frame Bawaan dengan Desain Asli Lengkap
+    let customFramesDatabase = [
+      { id: 'classic_black', name: 'Classic Black', type: 'color', color: '#111111' },
+      { id: 'clean_white', name: 'Clean White', type: 'color', color: '#ffffff' },
+      { id: 'pastel_pink', name: 'Soft Pink', type: 'color', color: '#ffccd5' }
+    ];
+
+    const frameImageCache = {};
+    const frameSlotsCache = {};
+
+    function preloadFrameImages() {
+      customFramesDatabase.forEach(f => {
+        if (f.type === 'image' && f.src) {
+          const img = new Image();
+          img.src = f.src;
+          img.onload = () => {
+            frameImageCache[f.id] = processImageKeying(img, true);
+            frameSlotsCache[f.id] = detectTransparentSlots(frameImageCache[f.id]);
+            if (currentFrame === f.id) renderPhotobooth();
+          };
+        }
+      });
+    }
+
+    function processImageKeying(img, allowColorKey) {
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = img.naturalWidth || img.width;
+      offCanvas.height = img.naturalHeight || img.height;
+      const offCtx = offCanvas.getContext('2d');
+      offCtx.drawImage(img, 0, 0);
+
+      try {
+        const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
+        const data = imgData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+          let r = data[i], g = data[i+1], b = data[i+2];
+          
+          // Hilangkan warna latar contoh template (apabila ada) agar transparan penuh
+          const isSkyBlue = (r > 160 && r < 230 && g > 200 && g < 255 && b > 230);
+          const isGrassGreen = (r > 100 && r < 180 && g > 140 && g < 220 && b < 80);
+
+          if (allowColorKey && (isSkyBlue || isGrassGreen)) {
+            data[i + 3] = 0;
+          }
+        }
+        offCtx.putImageData(imgData, 0, 0);
+        return offCanvas;
+      } catch (e) {
+        return img;
+      }
+    }
+
+
+    // Deteksi area transparan (lubang foto) pada frame.
+    // Foto akan ditempatkan tepat di dalam lubang ini, sehingga frame
+    // tidak pernah menutupi wajah pada hasil foto.
+    function detectTransparentSlots(source) {
+      const w = source.width, h = source.height;
+      if (!w || !h) return [];
+      const off = document.createElement('canvas');
+      off.width = w; off.height = h;
+      const octx = off.getContext('2d');
+      octx.drawImage(source, 0, 0);
+
+      let data;
+      try {
+        data = octx.getImageData(0, 0, w, h).data;
+      } catch (e) {
+        return [];
+      }
+
+      // Downsample supaya cepat
+      const step = Math.max(1, Math.round(Math.max(w, h) / 300));
+      const gw = Math.floor(w / step), gh = Math.floor(h / step);
+      const transparent = new Uint8Array(gw * gh);
+      let transCount = 0;
+      for (let gy = 0; gy < gh; gy++) {
+        for (let gx = 0; gx < gw; gx++) {
+          const px = gx * step, py = gy * step;
+          const a = data[(py * w + px) * 4 + 3];
+          if (a < 40) { transparent[gy * gw + gx] = 1; transCount++; }
+        }
+      }
+      if (transCount === 0) return [];
+
+      // Flood fill untuk mengelompokkan lubang
+      const visited = new Uint8Array(gw * gh);
+      const boxes = [];
+      const stack = [];
+      for (let i = 0; i < gw * gh; i++) {
+        if (!transparent[i] || visited[i]) continue;
+        stack.length = 0;
+        stack.push(i);
+        visited[i] = 1;
+        let minX = gw, maxX = -1, minY = gh, maxY = -1, area = 0;
+        while (stack.length) {
+          const cur = stack.pop();
+          const cx = cur % gw, cy = (cur - cx) / gw;
+          area++;
+          if (cx < minX) minX = cx;
+          if (cx > maxX) maxX = cx;
+          if (cy < minY) minY = cy;
+          if (cy > maxY) maxY = cy;
+          const neighbors = [cur - 1, cur + 1, cur - gw, cur + gw];
+          for (let n = 0; n < 4; n++) {
+            const nb = neighbors[n];
+            if (nb < 0 || nb >= gw * gh || visited[nb] || !transparent[nb]) continue;
+            if (n === 0 && cx === 0) continue;
+            if (n === 1 && cx === gw - 1) continue;
+            visited[nb] = 1;
+            stack.push(nb);
+          }
+        }
+        // Abaikan area transparan tepi/terlalu kecil
+        const boxW = (maxX - minX + 1), boxH = (maxY - minY + 1);
+        const fill = area / (boxW * boxH);
+        if (area < gw * gh * 0.01 || fill < 0.5) continue;
+        boxes.push({
+          x: minX * step,
+          y: minY * step,
+          w: boxW * step,
+          h: boxH * step
+        });
+      }
+
+      // Urutkan atas ke bawah, lalu kiri ke kanan
+      boxes.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+      return boxes;
+    }
+
+    // Gambar foto dengan mode "cover" agar proporsi tidak gepeng
+    function drawPhotoCover(photo, slot) {
+      const pw = photo.width, ph = photo.height;
+      if (!pw || !ph) return;
+      const scale = Math.max(slot.w / pw, slot.h / ph);
+      const dw = pw * scale, dh = ph * scale;
+      const dx = slot.x + (slot.w - dw) / 2;
+      const dy = slot.y + (slot.h - dh) / 2;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(slot.x, slot.y, slot.w, slot.h);
+      ctx.clip();
+      ctx.drawImage(photo, dx, dy, dw, dh);
+      ctx.restore();
+    }
+
+    async function initCamera() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+
+      try {
+        const constraints = {
+          video: { width: { ideal: 1280 }, height: { ideal: 960 }, facingMode: currentFacingMode },
+          audio: false
+        };
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+      } catch (err) {
+        console.error("Akses kamera tidak diizinkan/tersedia:", err);
+      }
+    }
+
+    initCamera();
+    renderFrameSelectorUI();
+    preloadFrameImages();
+    loadSharedFrames();
+
+    function toggleMirrorMode() {
+      isMirrored = !isMirrored;
+      const btn = document.getElementById('btn-toggle-mirror');
+      if (isMirrored) {
+        video.classList.add('mirrored');
+        btn.classList.add('btn-active');
+      } else {
+        video.classList.remove('mirrored');
+        btn.classList.remove('btn-active');
+      }
+    }
+
+    function switchCameraFacing() {
+      currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+      initCamera();
+    }
+
+    let adminPin = null;
+
+    async function loadSharedFrames() {
+      try {
+        const res = await fetch('https://kyutbooth-magic-moments.lovable.app/api/public/frames', { cache: 'no-store' });
+        const json = await res.json();
+        const shared = (json.frames || []).map(f => ({
+          id: 'custom_' + f.id, dbId: f.id, name: f.name, type: 'image', src: (f.image_url.startsWith('/') ? 'https://kyutbooth-magic-moments.lovable.app' + f.image_url : f.image_url)
+        }));
+        customFramesDatabase = customFramesDatabase.filter(f => !f.id.startsWith('custom_')).concat(shared);
+        shared.forEach(f => {
+          const img = new Image();
+          img.onload = () => {
+            frameImageCache[f.id] = processImageKeying(img, false);
+            frameSlotsCache[f.id] = detectTransparentSlots(frameImageCache[f.id]);
+            if (currentFrame === f.id) renderPhotobooth();
+          };
+          img.src = f.src;
+        });
+        renderFrameSelectorUI();
+      } catch (e) {
+        console.error('Gagal memuat frame', e);
+      }
+    }
+
+    async function toggleAdminAuth() {
+      if (isAdmin) {
+        isAdmin = false;
+        adminPin = null;
+        document.getElementById('admin-panel').classList.remove('active');
+        document.getElementById('role-indicator').className = 'role-badge badge-user';
+        document.getElementById('role-indicator').innerHTML = '<i class="fa-solid fa-user"></i> Mode User';
+        document.getElementById('toggle-admin-btn').innerHTML = '<i class="fa-solid fa-lock"></i> Login Admin';
+        renderFrameSelectorUI();
+      } else {
+        const pin = prompt("Masukkan PIN Admin:");
+        if (pin === null) return;
+        let ok = false;
+        try {
+          const res = await fetch('https://kyutbooth-magic-moments.lovable.app/api/public/frames', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'verify', pin })
+          });
+          ok = (await res.json()).ok === true;
+        } catch (e) {}
+        if (ok) {
+          isAdmin = true;
+          adminPin = pin;
+          document.getElementById('admin-panel').classList.add('active');
+          document.getElementById('role-indicator').className = 'role-badge badge-admin';
+          document.getElementById('role-indicator').innerHTML = '<i class="fa-solid fa-user-gear"></i> Mode Admin';
+          document.getElementById('toggle-admin-btn').innerHTML = '<i class="fa-solid fa-right-from-bracket"></i> Logout Admin';
+          renderFrameSelectorUI();
+        } else {
+          alert("PIN Salah!");
+        }
+      }
+    }
+
+    function uploadFrameAsAdmin() {
+      if (!isAdmin) return;
+      const nameInput = document.getElementById('frame-name-input').value.trim();
+      const fileInput = document.getElementById('admin-frame-file');
+
+      if (!nameInput) return alert("Masukkan nama frame!");
+      if (!fileInput.files || !fileInput.files[0]) return alert("Pilih file gambar frame!");
+      if (fileInput.files[0].size > 10 * 1024 * 1024) return alert("Ukuran gambar maksimal 10MB.");
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          const res = await fetch('https://kyutbooth-magic-moments.lovable.app/api/public/frames', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'upload', pin: adminPin, name: nameInput, dataUrl: e.target.result })
+          });
+          const json = await res.json();
+          if (!res.ok) return alert(json.error || 'Gagal mengunggah frame.');
+          document.getElementById('frame-name-input').value = '';
+          fileInput.value = '';
+          currentFrame = 'custom_' + json.frame.id;
+          await loadSharedFrames();
+          selectedFrameObj = customFramesDatabase.find(f => f.id === currentFrame) || null;
+          renderPhotobooth();
+          alert(`Frame "${nameInput}" berhasil ditambahkan dan sekarang bisa dipakai semua pengunjung!`);
+        } catch (err) {
+          alert('Gagal mengunggah frame. Coba lagi.');
+        }
+      };
+      reader.readAsDataURL(fileInput.files[0]);
+    }
+
+    function renderFrameSelectorUI() {
+      const listContainer = document.getElementById('frame-list');
+      listContainer.replaceChildren();
+
+      customFramesDatabase.forEach(f => {
+        const option = document.createElement('div');
+        option.className = `frame-option ${currentFrame === f.id ? 'selected' : ''}`;
+        option.onclick = () => selectFrameItem(f, option);
+
+        if (f.type === 'color') {
+          const swatch = document.createElement('div');
+          swatch.style.cssText = `width:100%; height:75px; background:${f.color}; border-radius:6px;`;
+          option.appendChild(swatch);
+        } else {
+          const image = document.createElement('img');
+          image.src = f.src;
+          image.alt = f.name;
+          option.appendChild(image);
+        }
+        const label = document.createElement('span');
+        label.textContent = f.name;
+        option.appendChild(label);
+
+        if (isAdmin && f.id.startsWith('custom_')) {
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.className = 'frame-delete';
+          remove.title = `Hapus frame ${f.name}`;
+          remove.setAttribute('aria-label', `Hapus frame ${f.name}`);
+          remove.innerHTML = '<i class="fa-solid fa-trash"></i>';
+          remove.onclick = event => {
+            event.stopPropagation();
+            deleteUploadedFrame(f.id);
+          };
+          option.appendChild(remove);
+        }
+        listContainer.appendChild(option);
+      });
+    }
+
+    async function deleteUploadedFrame(id) {
+      if (!isAdmin || !id.startsWith('custom_')) return;
+      const frame = customFramesDatabase.find(f => f.id === id);
+      if (!frame || !confirm(`Hapus frame "${frame.name}" untuk semua pengunjung?`)) return;
+      try {
+        const res = await fetch('https://kyutbooth-magic-moments.lovable.app/api/public/frames', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', pin: adminPin, id: frame.dbId })
+        });
+        if (!res.ok) return alert((await res.json()).error || 'Gagal menghapus frame.');
+      } catch (e) { return alert('Gagal menghapus frame.'); }
+      delete frameImageCache[id];
+      delete frameSlotsCache[id];
+      if (currentFrame === id) currentFrame = 'classic_black';
+      await loadSharedFrames();
+      selectedFrameObj = customFramesDatabase.find(f => f.id === currentFrame) || null;
+      renderPhotobooth();
+    }
+
+    function selectFrameItem(frameObj, el) {
+      currentFrame = frameObj.id;
+      selectedFrameObj = frameObj;
+      document.querySelectorAll('.frame-option').forEach(f => f.classList.remove('selected'));
+      el.classList.add('selected');
+      renderPhotobooth();
+    }
+
+    let isCounting = false;
+    let countdownTimer = null;
+
+    function getTotalSlots() {
+      const activeFrame = customFramesDatabase.find(f => f.id === currentFrame) || customFramesDatabase[0];
+      if (activeFrame.type === 'image' && frameImageCache[activeFrame.id]) {
+        const slots = frameSlotsCache[activeFrame.id];
+        return (slots && slots.length > 0) ? slots.length : 3;
+      }
+      if (currentLayout === 'grid') return 4;
+      if (currentLayout === 'single') return 1;
+      return 3;
+    }
+
+    // Satu kali tekan: hitung mundur otomatis untuk setiap foto sampai slot terakhir terisi
+    function takeSnapWithCountdown() {
+      if (isCounting) return; // abaikan tekanan berulang saat sesi foto berjalan
+      if (capturedPhotos.length >= getTotalSlots()) resetGallery(); // strip penuh -> mulai sesi baru
+      isCounting = true;
+
+      uploadPreview.style.display = 'none';
+      video.style.display = 'block';
+      runCountdownForNextPhoto();
+    }
+
+    function runCountdownForNextPhoto() {
+      let count = 3;
+      countdownEl.innerText = count;
+      countdownEl.style.display = 'flex';
+
+      if (countdownTimer) clearInterval(countdownTimer);
+      countdownTimer = setInterval(() => {
+        count--;
+        if (count > 0) {
+          countdownEl.innerText = count;
+        } else {
+          clearInterval(countdownTimer);
+          countdownTimer = null;
+          countdownEl.style.display = 'none';
+          triggerFlash();
+          capturePhotoFromVideo(() => {
+            if (capturedPhotos.length < getTotalSlots()) {
+              setTimeout(runCountdownForNextPhoto, 1000); // jeda singkat untuk ganti pose
+            } else {
+              isCounting = false;
+            }
+          });
+        }
+      }, 1000);
+    }
+
+    function triggerFlash() {
+      flashEl.classList.add('flash-active');
+      setTimeout(() => flashEl.classList.remove('flash-active'), 300);
+    }
+
+    function capturePhotoFromVideo(onDone) {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = 640;
+      tempCanvas.height = 480;
+      const tempCtx = tempCanvas.getContext('2d');
+      
+      if (isMirrored) {
+        tempCtx.translate(tempCanvas.width, 0);
+        tempCtx.scale(-1, 1);
+      }
+
+      tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+
+      const img = new Image();
+      img.src = tempCanvas.toDataURL('image/png');
+      img.onload = () => {
+        pushPhotoToGallery(img);
+        if (onDone) onDone();
+      };
+    }
+
+    function triggerUpload() {
+      document.getElementById('file-input').click();
+    }
+
+    function handleFileUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          video.style.display = 'none';
+          uploadPreview.src = img.src;
+          uploadPreview.style.display = 'block';
+          pushPhotoToGallery(img);
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function pushPhotoToGallery(img) {
+      capturedPhotos.push(img);
+      updatePhotoOrderUI();
+      renderPhotobooth();
+    }
+
+    function movePhoto(index, direction) {
+      const newIndex = index + direction;
+      if (newIndex < 0 || newIndex >= capturedPhotos.length) return;
+
+      const temp = capturedPhotos[index];
+      capturedPhotos[index] = capturedPhotos[newIndex];
+      capturedPhotos[newIndex] = temp;
+
+      updatePhotoOrderUI();
+      renderPhotobooth();
+    }
+
+    function deletePhoto(index) {
+      capturedPhotos.splice(index, 1);
+      updatePhotoOrderUI();
+      renderPhotobooth();
+    }
+
+    function updatePhotoOrderUI() {
+      const listContainer = document.getElementById('photo-order-list');
+      if (capturedPhotos.length === 0) {
+        listContainer.innerHTML = '<p style="font-size: 0.85rem; color: #888;">Belum ada foto diambil.</p>';
+        return;
+      }
+
+      listContainer.innerHTML = '';
+      capturedPhotos.forEach((img, idx) => {
+        const item = document.createElement('div');
+        item.className = 'photo-item';
+        item.innerHTML = `
+          <span><b>#${idx + 1}</b></span>
+          <img src="${img.src}" alt="Foto ${idx + 1}">
+          <div class="actions">
+            <button class="btn btn-sm" onclick="movePhoto(${idx}, -1)" ${idx === 0 ? 'disabled' : ''}><i class="fa-solid fa-arrow-up"></i></button>
+            <button class="btn btn-sm" onclick="movePhoto(${idx}, 1)" ${idx === capturedPhotos.length - 1 ? 'disabled' : ''}><i class="fa-solid fa-arrow-down"></i></button>
+            <button class="btn btn-sm btn-danger" onclick="deletePhoto(${idx})" style="background:#ee5d50; color:white;"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        `;
+        listContainer.appendChild(item);
+      });
+    }
+
+    function resetGallery() {
+      capturedPhotos = [];
+      updatePhotoOrderUI();
+      renderPhotobooth();
+    }
+
+    function setLayout(mode, btnEl) {
+      currentLayout = mode;
+      document.querySelectorAll('.layout-btn').forEach(b => b.classList.remove('active'));
+      btnEl.classList.add('active');
+      renderPhotobooth();
+    }
+
+    function renderPhotobooth() {
+      const activeFrame = customFramesDatabase.find(f => f.id === currentFrame) || customFramesDatabase[0];
+
+      if (activeFrame.type === 'image' && frameImageCache[activeFrame.id]) {
+        const overlayImg = frameImageCache[activeFrame.id];
+
+        canvas.width = overlayImg.width || 450;
+        canvas.height = overlayImg.height || 800;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (!frameSlotsCache[activeFrame.id]) {
+          frameSlotsCache[activeFrame.id] = detectTransparentSlots(overlayImg);
+        }
+        const detectedSlots = frameSlotsCache[activeFrame.id];
+        const hasHoles = detectedSlots && detectedSlots.length > 0;
+        // Samakan lebar area foto dengan strip biasa (sekitar 444px),
+        // bukan lebar gambar frame yang bisa berbeda-beda proporsinya.
+        const largestSlotWidth = hasHoles
+          ? Math.max(...detectedSlots.map(slot => slot.w))
+          : canvas.width * 0.72;
+        canvas.style.maxWidth = `${Math.ceil(444 * canvas.width / Math.max(1, largestSlotWidth))}px`;
+
+        let slots;
+        if (hasHoles) {
+          slots = detectedSlots;
+        } else {
+          // Frame tanpa transparansi: pakai posisi standar strip 3 foto
+          const slotWidth = canvas.width * 0.72;
+          const slotHeight = canvas.height * 0.24;
+          const startX = (canvas.width - slotWidth) / 2;
+          slots = [0.08, 0.36, 0.64].map(p => ({
+            x: startX, y: canvas.height * p, w: slotWidth, h: slotHeight
+          }));
+        }
+
+        // Frame tanpa lubang transparan digambar sebagai LATAR (paling bawah),
+        // agar tidak menimpa hasil foto.
+        if (!hasHoles) {
+          ctx.drawImage(overlayImg, 0, 0, canvas.width, canvas.height);
+        }
+
+        // Layer foto
+        for (let i = 0; i < slots.length; i++) {
+          const slot = slots[i];
+          if (capturedPhotos[i]) {
+            drawPhotoCover(capturedPhotos[i], slot);
+          } else {
+            ctx.fillStyle = "rgba(0,0,0,0.05)";
+            ctx.fillRect(slot.x, slot.y, slot.w, slot.h);
+          }
+        }
+
+        // Frame dengan lubang transparan digambar di ATAS foto
+        if (hasHoles) {
+          ctx.drawImage(overlayImg, 0, 0, canvas.width, canvas.height);
+        }
+
+      } else {
+        canvas.style.maxWidth = '500px';
+        const photoWidth = 400;
+        const photoHeight = 300;
+        const padding = 25;
+        const topBottomMargin = 30;
+
+        let cols = 1, rows = 3;
+        if (currentLayout === 'grid') { cols = 2; rows = 2; }
+        else if (currentLayout === 'single') { cols = 1; rows = 1; }
+
+        canvas.width = (photoWidth * cols) + (padding * (cols + 1));
+        canvas.height = (photoHeight * rows) + (padding * (rows + 1)) + (topBottomMargin * 2);
+
+        ctx.fillStyle = activeFrame.color || '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        let totalSlots = cols * rows;
+        for (let i = 0; i < totalSlots; i++) {
+          let col = i % cols;
+          let row = Math.floor(i / cols);
+
+          let x = padding + col * (photoWidth + padding);
+          let y = topBottomMargin + padding + row * (photoHeight + padding);
+
+          if (capturedPhotos[i]) {
+            ctx.drawImage(capturedPhotos[i], x, y, photoWidth, photoHeight);
+          } else {
+            ctx.fillStyle = "rgba(0,0,0,0.06)";
+            ctx.fillRect(x, y, photoWidth, photoHeight);
+            ctx.fillStyle = "#888888";
+            ctx.font = "bold 16px Inter";
+            ctx.textAlign = "center";
+            ctx.fillText(`[ Slot Foto ${i+1} ]`, x + photoWidth/2, y + photoHeight/2);
+          }
+        }
+      }
+    }
+
+    function downloadPhoto() {
+      const link = document.createElement('a');
+      link.download = `photobooth-${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    renderPhotobooth();
+  </script>
+</body>
+</html>
